@@ -187,7 +187,14 @@ class OllamaClient:
         """Check if a model is available in Ollama."""
         try:
             models = self.client.list()
-            available_models = [m["name"] for m in models["models"]]
+            # Ollama returns models list, each model has 'name' or 'model' key
+            available_models = []
+            for m in models.get("models", []):
+                # Try both 'name' and 'model' keys
+                model_id = m.get("name") or m.get("model") or ""
+                available_models.append(model_id)
+            
+            logger.debug(f"Available models: {available_models}")
             return model_name in available_models
         except Exception as e:
             logger.error(f"Failed to check model availability: {e}")

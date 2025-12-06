@@ -159,15 +159,24 @@ class Neo4jConnector:
             Relationship properties
         """
         with self.get_session() as session:
-            # First ensure entities exist
-            session.run(
-                "MERGE (e:Entity {entity_id: $entity_id})",
+            # Ensure entities exist - but they must already have canonical_name from upsert_entity
+            # Just verify they exist, don't create empty entities
+            source_check = session.run(
+                "MATCH (e:Entity {entity_id: $entity_id}) RETURN e.canonical_name AS name",
                 entity_id=source_id
-            )
-            session.run(
-                "MERGE (e:Entity {entity_id: $entity_id})",
+            ).single()
+            
+            target_check = session.run(
+                "MATCH (e:Entity {entity_id: $entity_id}) RETURN e.canonical_name AS name",
                 entity_id=target_id
-            )
+            ).single()
+            
+            if not source_check or not target_check:
+                raise ValueError(
+                    f"Entities must exist before creating relationship. "
+                    f"Source {source_id} exists: {bool(source_check)}, "
+                    f"Target {target_id} exists: {bool(target_check)}"
+                )
             
             # Upsert relationship
             query = f"""
@@ -219,28 +228,32 @@ class Neo4jConnector:
             Subgraph with nodes and edges
         """
         with self.get_session() as session:
-            query = """
-            MATCH path = (start:Entity)-[r*1..$depth]-(end:Entity)
+            # Depth must be hardcoded in the query, not a parameter
+            query = f"""
+            MATCH path = (start:Entity)-[r*1..{depth}]-(end:Entity)
             WHERE start.entity_id IN $entity_ids
                 AND ALL(rel IN relationships(path) WHERE rel.confidence >= $min_confidence)
-            WITH DISTINCT nodes(path) AS nodes, relationships(path) AS rels
-            UNWIND nodes AS node
-            UNWIND rels AS rel
+            WITH nodes(path) AS path_nodes, relationships(path) AS path_rels
+            UNWIND path_nodes AS node
+            WITH COLLECT(DISTINCT node) AS all_nodes, path_rels
+            UNWIND path_rels AS rel_list
+            UNWIND rel_list AS rel
             RETURN 
-                COLLECT(DISTINCT node) AS nodes,
+                all_nodes AS nodes,
                 COLLECT(DISTINCT rel) AS relationships
             """
             result = session.run(
                 query,
                 entity_ids=entity_ids,
-                depth=depth,
                 min_confidence=min_confidence,
             )
             record = result.single()
             if record:
+                nodes = [dict(n) for n in record["nodes"]] if record["nodes"] else []
+                relationships = [dict(r) for r in record["relationships"]] if record["relationships"] else []
                 return {
-                    "nodes": [dict(n) for n in record["nodes"]],
-                    "relationships": [dict(r) for r in record["relationships"]],
+                    "nodes": nodes,
+                    "relationships": relationships,
                 }
             return {"nodes": [], "relationships": []}
     

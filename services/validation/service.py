@@ -625,12 +625,12 @@ class ValidationEngine:
     ) -> float:
         """
         Aggregate confidence scores during bootstrap.
-        Give more weight to external sources.
+        Give balanced weight, trusting high-quality LLM (Groq) more.
         """
-        # Weights: favor external sources during bootstrap
-        w_llm = 0.3
-        w_wiki = 0.4
-        w_wikidata = 0.3
+        # Weights: balanced approach, trust Groq's strong performance
+        w_llm = 0.5  # Groq is very accurate
+        w_wiki = 0.3
+        w_wikidata = 0.2
         
         aggregated = (w_llm * llm_conf) + (w_wiki * wiki_conf) + (w_wikidata * wikidata_conf)
         

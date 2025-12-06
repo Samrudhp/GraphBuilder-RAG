@@ -7,12 +7,31 @@ Async task definitions for:
 - Triple validation
 - Triple fusion
 """
+import sys
+import os
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 import logging
+import asyncio
 from celery import Celery
 
 from shared.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
+
+# Create a single event loop for all async operations (Windows fix)
+try:
+    _event_loop = asyncio.get_event_loop()
+    if _event_loop.is_closed():
+        _event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_event_loop)
+except RuntimeError:
+    _event_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(_event_loop)
 
 # Initialize Celery
 settings = get_settings()
@@ -46,10 +65,9 @@ def normalize_document(self, document_id: str):
         logger.info(f"Task: Normalizing document {document_id}")
         
         from services.normalization.service import NormalizationService
-        import asyncio
         
         service = NormalizationService()
-        result = asyncio.run(service.normalize_document(document_id))
+        result = _event_loop.run_until_complete(service.normalize_document(document_id))
         
         logger.info(f"Document normalized: {result.document_id}")
         return {
@@ -76,10 +94,9 @@ def extract_triples(self, document_id: str):
         logger.info(f"Task: Extracting triples from {document_id}")
         
         from services.extraction.service import ExtractionService
-        import asyncio
         
         service = ExtractionService()
-        results = asyncio.run(service.extract_from_document(document_id))
+        results = _event_loop.run_until_complete(service.extract_from_document(document_id))
         
         logger.info(f"Extracted {len(results)} triples from {document_id}")
         return {
@@ -105,10 +122,9 @@ def validate_triples(self, document_id: str):
         logger.info(f"Task: Validating triples for {document_id}")
         
         from services.validation.service import ValidationEngine
-        import asyncio
         
         engine = ValidationEngine()
-        results = asyncio.run(engine.validate_document_triples(document_id))
+        results = _event_loop.run_until_complete(engine.validate_document_triples(document_id))
         
         accepted = [v for v in results if v.status.value == "validated"]
         
@@ -139,12 +155,19 @@ def fuse_triples(self, document_id: str):
         logger.info(f"Task: Fusing triples for {document_id}")
         
         from services.fusion.service import FusionService
-        import asyncio
         
         service = FusionService()
-        results = asyncio.run(service.fuse_document_triples(document_id))
+        results = _event_loop.run_until_complete(service.fuse_document_triples(document_id))
         
         logger.info(f"Fused {len(results)} edges into knowledge graph")
+        
+        # Emit embedding task after successful fusion
+        try:
+            embed_document.delay(document_id)
+            logger.info(f"Embedding task emitted for: {document_id}")
+        except Exception as e:
+            logger.error(f"Failed to emit embedding task: {e}")
+        
         return {
             "status": "success",
             "edges_created": len(results),
@@ -168,10 +191,10 @@ def embed_document(self, document_id: str):
         logger.info(f"Task: Embedding document {document_id}")
         
         from services.embedding.service import EmbeddingPipelineService
-        import asyncio
         
+        # Use the global event loop (Windows fix)
         service = EmbeddingPipelineService()
-        num_chunks = asyncio.run(service.embed_document(document_id))
+        num_chunks = _event_loop.run_until_complete(service.embed_document(document_id))
         
         # Save FAISS index periodically
         service.faiss_service.save_index()

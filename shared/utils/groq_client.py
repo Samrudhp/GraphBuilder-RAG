@@ -147,6 +147,164 @@ class GroqClient:
         except Exception as e:
             logger.error(f"Groq JSON API call failed: {e}", exc_info=True)
             raise
+    
+    async def generate_extraction(
+        self,
+        text: str,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.1,
+        max_tokens: int = 2048,
+    ) -> dict:
+        """
+        Generate structured extraction using Groq API (replaces Ollama extraction).
+        
+        Args:
+            text: Text to extract from
+            system_prompt: System instruction
+            user_prompt: User prompt with context
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            
+        Returns:
+            Parsed JSON response with triples
+        """
+        logger.debug(f"Extraction request: {len(text)} chars")
+        
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"},
+                stream=False,
+            )
+            
+            answer = response.choices[0].message.content.strip()
+            
+            # Parse JSON
+            import json
+            parsed = json.loads(answer)
+            
+            logger.debug(f"Extracted {len(parsed.get('triples', []))} triples")
+            return parsed
+            
+        except Exception as e:
+            logger.error(f"Extraction generation failed: {e}", exc_info=True)
+            raise
+    
+    async def generate_reasoning(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.2,
+        max_tokens: int = 4096,
+    ) -> dict:
+        """
+        Generate reasoning response using Groq API (replaces Ollama reasoning).
+        
+        Args:
+            system_prompt: System instruction
+            user_prompt: User prompt
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            
+        Returns:
+            Parsed JSON response
+        """
+        logger.debug("Reasoning request")
+        
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"},
+                stream=False,
+            )
+            
+            answer = response.choices[0].message.content.strip()
+            
+            # Parse JSON
+            import json
+            parsed = json.loads(answer)
+            
+            return parsed
+            
+        except Exception as e:
+            logger.error(f"Reasoning generation failed: {e}", exc_info=True)
+            raise
+    
+    async def generate_cypher(
+        self,
+        question: str,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.1,
+        max_tokens: int = 1024,
+    ) -> dict:
+        """
+        Generate Cypher query from natural language using Groq API (NL2Cypher).
+        
+        This is a CORE feature for the conference paper:
+        "Querying property graphs with natural language interfaces powered by LLMs"
+        
+        Args:
+            question: Natural language question
+            system_prompt: NL2CYPHER_SYSTEM_PROMPT with schema
+            user_prompt: Formatted NL2CYPHER_USER_TEMPLATE
+            temperature: Sampling temperature (low for precise queries)
+            max_tokens: Maximum tokens to generate
+            
+        Returns:
+            Dict with:
+                - cypher: Generated Cypher query string
+                - parameters: Query parameters
+                - explanation: What the query does
+        """
+        logger.debug(f"NL2Cypher request: {question[:100]}")
+        
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"},
+                stream=False,
+            )
+            
+            answer = response.choices[0].message.content.strip()
+            
+            # Parse JSON
+            import json
+            parsed = json.loads(answer)
+            
+            # Validate required fields
+            if "cypher" not in parsed:
+                raise ValueError("Generated response missing 'cypher' field")
+            
+            logger.info(
+                f"NL2Cypher generated query: {parsed.get('explanation', 'N/A')}"
+            )
+            logger.debug(f"Cypher: {parsed['cypher']}")
+            
+            return parsed
+            
+        except Exception as e:
+            logger.error(f"NL2Cypher generation failed: {e}", exc_info=True)
+            raise
 
 
 @lru_cache(maxsize=1)

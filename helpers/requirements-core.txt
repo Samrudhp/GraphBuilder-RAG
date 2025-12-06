@@ -44,10 +44,8 @@ openpyxl==3.1.2
 httpx>=0.27.0,<0.29.0
 aiohttp>=3.9.1,<4.0.0
 
-# LLM Integration
-ollama>=0.6.0,<1.0.0
-langchain>=0.1.4,<0.4.0
-langchain-community>=0.0.16,<0.4.0
+# LLM Integration (Groq Cloud API)
+groq>=0.4.0,<1.0.0
 
 # Ontology & Rules
 owlready2==0.44

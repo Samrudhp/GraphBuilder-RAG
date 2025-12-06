@@ -39,27 +39,35 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Prometheus metrics
-REQUESTS_TOTAL = Counter(
-    "graphbuilder_requests_total",
-    "Total number of requests",
-    ["method", "endpoint", "status"],
-)
-REQUEST_DURATION = Histogram(
-    "graphbuilder_request_duration_seconds",
-    "Request duration in seconds",
-    ["method", "endpoint"],
-)
-DOCUMENTS_INGESTED = Counter(
-    "graphbuilder_documents_ingested_total",
-    "Total documents ingested",
-    ["source_type"],
-)
-QUERIES_PROCESSED = Counter(
-    "graphbuilder_queries_processed_total",
-    "Total queries processed",
-    ["verification_status"],
-)
+# Prometheus metrics - use try/except to handle reloader registration
+try:
+    REQUESTS_TOTAL = Counter(
+        "graphbuilder_requests_total",
+        "Total number of requests",
+        ["method", "endpoint", "status"],
+    )
+    REQUEST_DURATION = Histogram(
+        "graphbuilder_request_duration_seconds",
+        "Request duration in seconds",
+        ["method", "endpoint"],
+    )
+    DOCUMENTS_INGESTED = Counter(
+        "graphbuilder_documents_ingested_total",
+        "Total documents ingested",
+        ["source_type"],
+    )
+    QUERIES_PROCESSED = Counter(
+        "graphbuilder_queries_processed_total",
+        "Total queries processed",
+        ["verification_status"],
+    )
+except ValueError:
+    # Metrics already registered (happens with auto-reloader)
+    from prometheus_client import REGISTRY
+    REQUESTS_TOTAL = REGISTRY._names_to_collectors.get("graphbuilder_requests_total")
+    REQUEST_DURATION = REGISTRY._names_to_collectors.get("graphbuilder_request_duration_seconds")
+    DOCUMENTS_INGESTED = REGISTRY._names_to_collectors.get("graphbuilder_documents_ingested_total")
+    QUERIES_PROCESSED = REGISTRY._names_to_collectors.get("graphbuilder_queries_processed_total")
 
 
 @asynccontextmanager
@@ -98,14 +106,13 @@ async def lifespan(app: FastAPI):
         logger.info("Creating new FAISS index")
         faiss_service.create_index()
     
-    # Verify Ollama models
-    from shared.utils.ollama_client import get_ollama_client
+    # Verify Groq API key
+    from shared.utils.groq_client import get_groq_client
     try:
-        ollama = get_ollama_client()
-        ollama.ensure_models_available()
-        logger.info("Ollama models verified")
+        groq = get_groq_client()
+        logger.info(f"Groq client ready with model: {groq.model}")
     except Exception as e:
-        logger.error(f"Ollama model check failed: {e}")
+        logger.error(f"Groq client initialization failed: {e}")
     
     logger.info("API server ready")
     
@@ -163,6 +170,7 @@ async def metrics_middleware(request, call_next):
 # ==================== API Endpoints ====================
 
 @app.get("/health", response_model=HealthResponse)
+@app.get("/api/v1/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint."""
     mongodb = get_mongodb()

@@ -29,7 +29,7 @@ from shared.prompts.templates import (
     EXTRACTION_SYSTEM_PROMPT,
     format_extraction_prompt,
 )
-from shared.utils.ollama_client import get_ollama_client
+from shared.utils.groq_client import get_groq_client
 
 logger = logging.getLogger(__name__)
 
@@ -153,11 +153,11 @@ class TableExtractor:
 
 
 class LLMExtractor:
-    """LLM-based triple extraction using DeepSeek."""
+    """LLM-based triple extraction using Groq."""
     
     def __init__(self):
         self.settings = get_settings().extraction
-        self.ollama = get_ollama_client()
+        self.groq = get_groq_client()
         
     async def extract_from_text(
         self,
@@ -201,7 +201,7 @@ class LLMExtractor:
         
         # Call LLM
         try:
-            response = await self.ollama.generate_extraction(
+            response = await self.groq.generate_extraction(
                 text=text,
                 system_prompt=EXTRACTION_SYSTEM_PROMPT,
                 user_prompt=user_prompt,

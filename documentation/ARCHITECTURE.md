@@ -219,25 +219,36 @@ All 13 major components of the GraphBuilder-RAG system have been successfully im
   - Provisional entity management
   - Resolved_to pointer for deduplication
 
-### ✅ 13. Query Service with GraphVerify
+### ✅ 13. Query Service with GraphVerify & NL2Cypher
 - **File:** `services/query/service.py`
 - **LLM:** Llama-3.3-70B-Versatile via Groq Cloud API (< 1s inference)
 - **Components:**
-  - **HybridRetrievalService**:
-    - FAISS semantic search
-    - Neo4j subgraph extraction
-    - Confidence and depth filtering
+  - **HybridRetrievalService with NL2Cypher** (CORE CONFERENCE FEATURE):
+    - **NL2Cypher**: LLM-powered natural language → Cypher query generation
+      - Uses NL2CYPHER_SYSTEM_PROMPT for schema-aware query generation
+      - Converts questions like "Who was Isaac Newton?" to valid Cypher
+      - Executes generated queries on Neo4j for precise graph retrieval
+      - Fallback to entity extraction if NL2Cypher fails
+    - FAISS semantic search for text chunks
+    - Neo4j subgraph extraction with confidence filtering
+    - Combined scoring (semantic + graph weights)
   - **PromptBuilder**:
     - Format graph edges with [Edge:ID] tags
+    - Separate KNOWLEDGE GRAPH CONTEXT and TEXT CHUNKS sections
     - QA_SYSTEM_PROMPT integration
   - **GraphVerify**:
     - LLM-based hallucination detection
     - Classification: SUPPORTED/UNSUPPORTED/CONTRADICTED/UNKNOWN
-    - Edge-level verification
+    - Edge-level verification against knowledge graph
   - **QueryService**:
     - End-to-end QA pipeline with Groq for fast reasoning
     - Evidence tracking with sources
     - Token usage monitoring
+
+**Conference Paper Feature**: "Querying property graphs with natural language interfaces powered by LLMs"
+- Natural language questions → LLM generates Cypher → Execute on Neo4j → Verifiable retrieval
+- Demonstrates graph-based retrieval for verifiable LLM responses
+- Combines symbolic reasoning (Cypher) with neural reasoning (LLM)
 
 ### ✅ 14. Worker Tasks (Celery)
 - **File:** `workers/tasks.py`

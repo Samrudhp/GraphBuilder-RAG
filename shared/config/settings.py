@@ -45,17 +45,6 @@ class RedisSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="REDIS_")
 
 
-class OllamaSettings(BaseSettings):
-    """Ollama LLM configuration."""
-    base_url: str = Field(default="http://localhost:11434")
-    extraction_model: str = Field(default="deepseek-r1:1.5b")
-    reasoning_model: str = Field(default="deepseek-r1:7b")
-    timeout: int = Field(default=120)
-    max_retries: int = Field(default=3)
-    
-    model_config = SettingsConfigDict(env_prefix="OLLAMA_")
-
-
 class GroqSettings(BaseSettings):
     """Groq Cloud API configuration for fast inference."""
     api_key: str = Field(default="")
@@ -65,7 +54,12 @@ class GroqSettings(BaseSettings):
     max_tokens: int = Field(default=4096)
     temperature: float = Field(default=0.2)
     
-    model_config = SettingsConfigDict(env_prefix="GROQ_")
+    model_config = SettingsConfigDict(
+        env_prefix="GROQ_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
 
 class EmbeddingSettings(BaseSettings):
@@ -117,7 +111,12 @@ class ValidationSettings(BaseSettings):
     bootstrap_require_wikipedia: bool = Field(default=True, description="Require Wikipedia verification during bootstrap")
     bootstrap_require_wikidata: bool = Field(default=True, description="Require Wikidata verification during bootstrap")
     
-    model_config = SettingsConfigDict(env_prefix="VALIDATION_")
+    model_config = SettingsConfigDict(
+        env_prefix="VALIDATION_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
 
 class EntityResolutionSettings(BaseSettings):
@@ -247,7 +246,6 @@ class Settings(BaseSettings):
     mongodb: MongoDBSettings = Field(default_factory=MongoDBSettings)
     neo4j: Neo4jSettings = Field(default_factory=Neo4jSettings)
     redis: RedisSettings = Field(default_factory=RedisSettings)
-    ollama: OllamaSettings = Field(default_factory=OllamaSettings)
     groq: GroqSettings = Field(default_factory=GroqSettings)
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
     faiss: FAISSSettings = Field(default_factory=FAISSSettings)

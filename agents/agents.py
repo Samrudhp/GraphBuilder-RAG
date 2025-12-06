@@ -27,7 +27,7 @@ from shared.prompts.templates import (
     format_conflict_resolution_prompt,
     format_schema_suggestion_prompt,
 )
-from shared.utils.ollama_client import get_ollama_client
+from shared.utils.groq_client import get_groq_client
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class BaseAgent(ABC):
         self.settings = get_settings()
         self.mongodb = get_mongodb()
         self.neo4j = get_neo4j()
-        self.ollama = get_ollama_client()
+        self.groq = get_groq_client()
         self.is_running = False
     
     @abstractmethod
@@ -429,21 +429,19 @@ class ConflictResolverAgent(BaseAgent):
         
         # Call LLM
         try:
-            response = await asyncio.to_thread(
-                self.ollama.generate_reasoning,
-                prompt,
+            response = await self.groq.generate_reasoning(
                 system_prompt=CONFLICT_RESOLUTION_SYSTEM_PROMPT,
+                user_prompt=prompt,
+                temperature=0.1,
+                max_tokens=2048,
             )
             
-            # Parse response (expecting JSON with winner_edge_id and reasoning)
-            import json
-            resolution = json.loads(response)
-            
-            if "winner_edge_id" not in resolution:
+            # Response is already parsed JSON
+            if "winner_edge_id" not in response:
                 logger.warning("LLM did not provide winner_edge_id")
                 return None
             
-            return resolution
+            return response
             
         except Exception as e:
             logger.error(f"LLM conflict resolution failed: {e}")
@@ -647,17 +645,15 @@ class SchemaSuggestorAgent(BaseAgent):
         prompt = format_schema_suggestion_prompt(predicate_group)
         
         try:
-            response = await asyncio.to_thread(
-                self.ollama.generate_reasoning,
-                prompt,
+            response = await self.groq.generate_reasoning(
                 system_prompt=SCHEMA_SUGGESTION_SYSTEM_PROMPT,
+                user_prompt=prompt,
+                temperature=0.2,
+                max_tokens=2048,
             )
             
-            # Parse response (expecting JSON with suggested schema)
-            import json
-            suggestion = json.loads(response)
-            
-            return suggestion
+            # Response is already parsed JSON
+            return response
             
         except Exception as e:
             logger.error(f"LLM schema suggestion failed: {e}")

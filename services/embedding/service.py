@@ -227,8 +227,11 @@ class FAISSIndexService:
             Tuple of (chunk_ids, scores)
         """
         if self.index is None:
-            logger.warning("Index not loaded, returning empty results")
-            return [], []
+            logger.warning("Index not loaded, attempting to load from disk")
+            self.load_index()
+            if self.index is None:
+                logger.error("Failed to load index, returning empty results")
+                return [], []
         
         # Set nprobe for IVF index
         if isinstance(self.index, faiss.IndexIVFFlat):
@@ -253,7 +256,7 @@ class FAISSIndexService:
                 chunk_ids.append(chunk_id)
                 result_scores.append(float(score))
         
-        logger.debug(f"Found {len(chunk_ids)} results")
+        logger.debug(f"Found {len(chunk_ids)} results from {len(self.chunk_id_map)} mapped chunks")
         return chunk_ids, result_scores
     
     def save_index(self, path: Optional[Path] = None):
@@ -284,7 +287,8 @@ class FAISSIndexService:
         map_file = load_path / "chunk_map.pkl"
         
         if not index_file.exists():
-            logger.warning(f"Index file not found: {index_file}")
+            logger.warning(f"Index file not found: {index_file} - creating new index")
+            self.create_index(self.settings.index_type)
             return
         
         # Load FAISS index
@@ -294,8 +298,11 @@ class FAISSIndexService:
         if map_file.exists():
             with open(map_file, "rb") as f:
                 self.chunk_id_map = pickle.load(f)
-        
-        logger.info(f"Index loaded from {load_path} (vectors: {self.index.ntotal})")
+            logger.info(f"Index loaded from {load_path} (vectors: {self.index.ntotal}, chunks: {len(self.chunk_id_map)})")
+        else:
+            logger.warning(f"Chunk map not found: {map_file}")
+            self.chunk_id_map = {}
+            logger.info(f"Index loaded from {load_path} (vectors: {self.index.ntotal}, NO chunk map)")
     
     def get_stats(self) -> dict:
         """Get index statistics."""
@@ -321,6 +328,9 @@ class EmbeddingPipelineService:
         
         self.embedding_service = EmbeddingService()
         self.faiss_service = FAISSIndexService()
+        
+        # Load existing FAISS index on initialization
+        self.faiss_service.load_index()
         
     async def embed_document(
         self,

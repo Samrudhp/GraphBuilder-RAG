@@ -1,7 +1,7 @@
 """Shared Pydantic models and schemas."""
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -165,7 +165,7 @@ class CandidateTriple(BaseModel):
 class ValidationResult(BaseModel):
     """Validation result for a triple."""
     rule_checks: dict[str, bool] = Field(default_factory=dict)
-    external_verifications: dict[str, Optional[bool]] = Field(default_factory=dict)
+    external_verifications: dict[str, Optional[float]] = Field(default_factory=dict)  # Changed to float for confidence scores
     confidence_score: float = Field(ge=0.0, le=1.0)
     validation_errors: list[str] = Field(default_factory=list)
     validated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -278,7 +278,7 @@ class QueryResponse(BaseModel):
     """Query response."""
     query_id: str
     question: str
-    answer: str
+    answer: Union[str, dict[str, Any]]  # Support both plain string and structured JSON
     verification_status: VerificationStatus
     confidence: float = Field(ge=0.0, le=1.0)
     sources: list[str]

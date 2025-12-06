@@ -55,6 +55,9 @@ data/
 *.log
 logs/
 celerybeat-schedule
+celerybeat-schedule.dat
+celerybeat-schedule.dir
+celerybeat-schedule.bak
 celerybeat.pid
 
 # Temporary files
@@ -85,6 +88,3 @@ htmlcov/
 
 # Documentation
 docs/_build/
-
-
-requirements.txt

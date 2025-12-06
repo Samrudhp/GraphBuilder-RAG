@@ -4,13 +4,29 @@
 
 EXTRACTION_SYSTEM_PROMPT = """You are a precise knowledge extraction system. Your task is to extract structured knowledge triples from text.
 
-RULES:
+CRITICAL RULES FOR TRIPLE STRUCTURE:
+1. Each triple must represent ONE atomic fact (subject → predicate → object)
+2. DO NOT combine multiple facts into one triple
+3. Subject and object must be DISTINCT entities (never merge profession + location)
+4. Predicates must clearly describe the relationship type
+
+CORRECT EXAMPLES:
+✓ "Albert Einstein" → "was born in" → "Ulm, Germany"
+✓ "Albert Einstein" → "had occupation" → "physicist"
+✓ "Marie Curie" → "won award" → "Nobel Prize"
+
+INCORRECT EXAMPLES (DO NOT DO THIS):
+✗ "Albert Einstein" → "was a physicist" → "Ulm, Germany" (conflates profession + birthplace)
+✗ "Marie Curie" → "was a chemist and Nobel laureate" → "Warsaw, Poland" (multiple facts merged)
+
+ADDITIONAL RULES:
 1. Extract only factual statements that can be verified
 2. Use canonical entity names (e.g., "United States" not "US")
-3. Use clear, specific predicates (relationships)
-4. Output ONLY valid JSON - no explanations, no markdown
+3. Use clear, specific predicates: "was born in", "had occupation", "won award", "published work"
+4. Output ONLY valid JSON - no explanations, no markdown, no thinking process
 5. Each triple must have: subject, predicate, object, confidence (0.0-1.0)
 6. Include subject_type and object_type when identifiable
+7. Set confidence higher (0.9+) for direct facts, lower (0.6-0.8) for inferred relationships
 
 ENTITY TYPES: Person, Organization, Location, Date, Concept, Product, Event, Other
 
@@ -46,17 +62,51 @@ NL2CYPHER_SYSTEM_PROMPT = """You are an expert at converting natural language qu
 
 SCHEMA:
 - Nodes: Entity(entity_id, canonical_name, entity_type, aliases)
-- Relationships: (Entity)-[RELATED {edge_id, confidence, version, evidence_ids}]->(Entity)
+- Relationships: (Entity)-[r:RELATED {edge_id, confidence, version, evidence_ids, relationship_type}]->(Entity)
 
-RULES:
-1. Generate valid Cypher queries only
-2. Use MATCH for retrieval, WHERE for filtering
-3. Always check confidence >= 0.5 for relationships
-4. Limit results to top 20 most relevant
-5. Return entity details and relationship properties
-6. Output ONLY valid JSON - no explanations
+CRITICAL MATCHING RULES:
+1. ALWAYS use case-insensitive matching with toLower() for entity names
+2. Search BOTH canonical_name AND aliases array
+3. Use CONTAINS for partial matching (e.g., "Einstein" matches "Albert Einstein")
+4. Handle possessives: "Einstein's" → search for "Einstein"
+5. For relationships, use variable like 'r' and access r.confidence, r.relationship_type
 
-OUTPUT FORMAT:
+QUERY PATTERNS:
+
+For finding an entity (handle variations, typos, partial names):
+```
+MATCH (e:Entity)
+WHERE toLower(e.canonical_name) CONTAINS toLower($name)
+   OR ANY(alias IN e.aliases WHERE toLower(alias) CONTAINS toLower($name))
+RETURN e
+```
+
+For finding relationships:
+```
+MATCH (e1:Entity)-[r:RELATED]->(e2:Entity)
+WHERE toLower(e1.canonical_name) CONTAINS toLower($name)
+  AND r.confidence >= 0.5
+RETURN e1, r, e2, r.relationship_type AS rel_type
+```
+
+For specific relationship types (published, won, etc.):
+```
+MATCH (e1:Entity)-[r:RELATED]->(e2:Entity)
+WHERE toLower(e1.canonical_name) CONTAINS toLower($name)
+  AND toLower(r.relationship_type) CONTAINS toLower($rel_type)
+  AND r.confidence >= 0.5
+RETURN e1, r, e2
+```
+
+BEST PRACTICES:
+1. Use parameters ($name) for all user input
+2. Always filter r.confidence >= 0.5
+3. Limit results to 20-50 most relevant
+4. Return relationship variable 'r' to access properties
+5. Use CONTAINS instead of exact match (=) for names
+6. Order by confidence DESC for best results
+
+OUTPUT FORMAT (strict JSON):
 {
   "cypher": "string - the Cypher query",
   "parameters": {
@@ -70,10 +120,25 @@ NL2CYPHER_USER_TEMPLATE = """Convert this question to a Cypher query:
 QUESTION: {question}
 
 CONTEXT:
-- User is interested in: {domain}
-- Related entities detected: {entities}
+- Domain: {domain}
+- Potential entities mentioned: {entities}
 
-Generate the Cypher query. Return ONLY the JSON object."""
+TASK:
+1. Extract the main entity name(s) from the question (handle possessives, variations)
+2. Identify what relationship type is being asked about (e.g., "won" → award, "published" → work, "discovered" → discovery)
+3. Generate a Cypher query using CONTAINS for flexible matching
+4. Use parameters for all entity names and relationship types
+5. Return entities and their relationships with confidence scores
+
+EXAMPLES:
+
+Question: "What did Einstein publish?"
+→ Search for entity containing "einstein", relationships containing "publish"
+
+Question: "Marie Curie's awards?"
+→ Search for entity containing "marie curie", relationships containing "award" or "won"
+
+Generate the Cypher query NOW. Return ONLY the JSON object, no other text."""
 
 # ==================== GRAPH-AUGMENTED QA PROMPTS ====================
 
