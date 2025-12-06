@@ -1,0 +1,72 @@
+# Core dependencies only - minimal install for production
+# Cross-platform compatible (Mac, Windows, Linux)
+
+# Core Framework
+fastapi>=0.109.0,<0.120.0
+uvicorn[standard]>=0.27.0,<0.35.0
+pydantic>=2.9.0,<3.0.0
+pydantic-settings>=2.6.0,<3.0.0
+
+# Async Task Queue
+celery==5.3.4
+redis==5.0.1
+
+# Database Drivers
+pymongo==4.6.1
+motor==3.3.2
+neo4j==5.16.0
+
+# Vector Search
+faiss-cpu==1.7.4
+numpy>=1.24.3,<2.0.0
+
+# Embeddings
+sentence-transformers==2.3.1
+torch>=2.1.0,<2.3.0
+transformers==4.36.2
+
+# Document Processing (basic)
+pypdf==3.17.4
+pdfplumber==0.10.3
+Pillow>=10.0.0
+
+# HTML Processing
+beautifulsoup4==4.12.3
+lxml>=5.1.0
+html2text==2020.1.16
+trafilatura==1.7.0
+
+# CSV/Tabular
+pandas>=2.1.0,<3.0.0
+openpyxl==3.1.2
+
+# HTTP Clients (for Wikipedia/Wikidata)
+httpx>=0.27.0,<0.29.0
+aiohttp>=3.9.1,<4.0.0
+
+# LLM Integration
+ollama>=0.6.0,<1.0.0
+langchain>=0.1.4,<0.4.0
+langchain-community>=0.0.16,<0.4.0
+
+# Ontology & Rules
+owlready2==0.44
+rdflib==7.0.0
+
+# Validation
+jsonschema==4.20.0
+validators==0.22.0
+
+# Configuration
+pyyaml>=6.0.1
+python-dotenv==1.0.0
+
+# Utilities
+tqdm==4.66.1
+python-dateutil==2.8.2
+tenacity==8.2.3
+regex>=2023.0.0
+
+# Logging
+structlog==24.1.0
+python-json-logger==2.0.7
