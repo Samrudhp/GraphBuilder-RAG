@@ -1,0 +1,17 @@
+# Benchmark Testing Dependencies
+
+# Visualization
+matplotlib>=3.5.0
+seaborn>=0.12.0
+
+# Data manipulation
+pandas>=2.0.0
+
+# Progress bars
+tqdm>=4.65.0
+
+# HTTP requests for dataset downloads
+httpx>=0.24.0
+
+# Plotting backend
+pillow>=10.0.0

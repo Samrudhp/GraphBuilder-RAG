@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-12-07T10:58:53.301996",
+  "benchmarks": {
+    "fever": {
+      "error": "error parsing value for field \"validation\" from source \"EnvSettingsSource\""
+    }
+  },
+  "baselines": {},
+  "summary": {
+    "num_benchmarks": 1,
+    "total_samples": 0,
+    "total_errors": 0,
+    "average_metrics": {}
+  }
+}
