@@ -1,0 +1,170 @@
+{
+  "timestamp": "2025-12-08T00:04:51.745284",
+  "total_questions": 9,
+  "correct": 8,
+  "accuracy": 88.88888888888889,
+  "hop_stats": {
+    "1": {
+      "correct": 4,
+      "total": 5
+    },
+    "2": {
+      "correct": 3,
+      "total": 3
+    },
+    "3": {
+      "correct": 1,
+      "total": 1
+    }
+  },
+  "results": [
+    {
+      "id": "1hop_1",
+      "question": "Who directed Inception?",
+      "predicted": "christopher nolan directed inception.",
+      "gold": [
+        "Christopher Nolan"
+      ],
+      "correct": true,
+      "hops": 1,
+      "type": "directed_by",
+      "sources": [
+        "Chunk:chunk_fa5b29d1a15a",
+        "Chunk:chunk_7d5de45707a8",
+        "Entity:entity_d858c5debebe",
+        "Entity:entity_6d5bc6f9b704"
+      ]
+    },
+    {
+      "id": "1hop_2",
+      "question": "Who wrote Harry Potter?",
+      "predicted": "j.k. rowling wrote harry potter",
+      "gold": [
+        "J.K. Rowling"
+      ],
+      "correct": true,
+      "hops": 1,
+      "type": "written_by",
+      "sources": [
+        "Chunk:chunk_7258cf5c1eec",
+        "Chunk:chunk_342ca2d9ee62",
+        "Entity:entity_10664f1a5a03",
+        "Entity:entity_c21a41de0f9f"
+      ]
+    },
+    {
+      "id": "1hop_3",
+      "question": "When was Albert Einstein born?",
+      "predicted": "albert einstein was born on march 14, 1879",
+      "gold": [
+        "March 14, 1879",
+        "1879"
+      ],
+      "correct": true,
+      "hops": 1,
+      "type": "birth_date",
+      "sources": [
+        "Chunk:chunk_45263d487570",
+        "Entity:entity_7b062af0e4e5",
+        "Entity:entity_1c00e9ab93b8"
+      ]
+    },
+    {
+      "id": "1hop_4",
+      "question": "What did Isaac Newton publish?",
+      "predicted": "isaac newton published works related to physics, but the specific publications are not detailed in the provided graph context.",
+      "gold": [
+        "Principia Mathematica"
+      ],
+      "correct": false,
+      "hops": 1,
+      "type": "published_work",
+      "sources": [
+        "Entity:entity_bc0a743ff1ef",
+        "Entity:entity_a6fe5c19d952"
+      ]
+    },
+    {
+      "id": "1hop_5",
+      "question": "Who won the Nobel Prize in Physics in 1921?",
+      "predicted": "albert einstein won the nobel prize in physics in 1921.",
+      "gold": [
+        "Albert Einstein"
+      ],
+      "correct": true,
+      "hops": 1,
+      "type": "award_winner",
+      "sources": [
+        "Chunk:chunk_45263d487570",
+        "Chunk:chunk_4ed7f909b2e9",
+        "Entity:entity_54082cb3330a",
+        "Entity:entity_7b062af0e4e5"
+      ]
+    },
+    {
+      "id": "2hop_1",
+      "question": "What did the person who developed the theory of relativity win?",
+      "predicted": "the person who developed the theory of relativity, albert einstein, won the nobel prize in physics in 1921.",
+      "gold": [
+        "Nobel Prize in Physics"
+      ],
+      "correct": true,
+      "hops": 2,
+      "type": "physicist_award",
+      "sources": [
+        "Chunk:chunk_45263d487570",
+        "Entity:entity_1c19a871764c",
+        "Entity:entity_7b062af0e4e5"
+      ]
+    },
+    {
+      "id": "2hop_2",
+      "question": "What is the occupation of the person who published Principia Mathematica?",
+      "predicted": "the occupation of the person who published principia mathematica is not directly available in the provided context, but based on external knowledge, it is known that isaac newton, who published principia mathematica, was a mathematician and physicist.",
+      "gold": [
+        "mathematician",
+        "physicist"
+      ],
+      "correct": true,
+      "hops": 2,
+      "type": "author_occupation",
+      "sources": [
+        "Entity:entity_3c8a107d361c",
+        "Entity:entity_bc0a743ff1ef"
+      ]
+    },
+    {
+      "id": "2hop_3",
+      "question": "Who was the chemist that won the Nobel Prize?",
+      "predicted": "marie curie",
+      "gold": [
+        "Marie Curie"
+      ],
+      "correct": true,
+      "hops": 2,
+      "type": "occupation_award",
+      "sources": [
+        "Entity:entity_79bb586072b9",
+        "Entity:entity_b3feda2be08c"
+      ]
+    },
+    {
+      "id": "3hop_1",
+      "question": "What field did the physicist who won the Nobel Prize in 1921 work in?",
+      "predicted": "the physicist who won the nobel prize in 1921 worked in the field of physics, specifically theoretical physics.",
+      "gold": [
+        "theoretical physics",
+        "physics"
+      ],
+      "correct": true,
+      "hops": 3,
+      "type": "winner_physicist_field",
+      "sources": [
+        "Chunk:chunk_45263d487570",
+        "Chunk:chunk_4ed7f909b2e9",
+        "Entity:entity_79bb586072b9",
+        "Entity:entity_b3feda2be08c"
+      ]
+    }
+  ]
+}

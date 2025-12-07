@@ -1,0 +1,166 @@
+{
+  "timestamp": "2025-12-08T00:49:37.957215",
+  "total_questions": 9,
+  "correct": 8,
+  "accuracy": 88.88888888888889,
+  "type_stats": {
+    "bridge": {
+      "correct": 3,
+      "total": 4
+    },
+    "comparison": {
+      "correct": 5,
+      "total": 5
+    }
+  },
+  "results": [
+    {
+      "id": "bridge_1",
+      "question": "What is the nationality of the director of the film Inception?",
+      "predicted": "```\n{\n  \"answer\": \"the director of the film inception, christopher nolan, is british-american.\",\n  \"claims\": [\n    {\n      \"claim\": \"christopher nolan is the director of inception\",\n      \"evidence_type\": \"text\",\n      \"evidence_ids\": [\"doc:norm_f97461d4e40f\", \"chunk:1\"],\n      \"confidence\": 0.75\n    },\n    {\n      \"claim\": \"christopher nolan is british-american\",\n      \"evidence_type\": \"text\",\n      \"evidence_ids\": [\"doc:norm_153b75144527\", \"chunk:2\"],\n      \"confidence\": 0.66\n    }\n  ],\n  \"sources\": [\"doc:norm_f97461d4e40f\", \"doc:norm_153b75144527\"],\n  \"reasoning_trace\": \"first, we identified the director of inception as christopher nolan using text chunk [doc:norm_f97461d4e40f, chunk:1]. then, we determined christopher nolan's nationality as british-american using text chunk [doc:norm_153b75144527, chunk:2].\"\n}\n```",
+      "gold": [
+        "British-American",
+        "British",
+        "American"
+      ],
+      "correct": true,
+      "type": "bridge",
+      "level": "easy",
+      "sources": [
+        "Chunk:chunk_fa5b29d1a15a",
+        "Chunk:chunk_7d5de45707a8",
+        "Entity:entity_d858c5debebe",
+        "Entity:entity_6d5bc6f9b704"
+      ]
+    },
+    {
+      "id": "bridge_2",
+      "question": "In what year was the university where Albert Einstein worked as a professor founded?",
+      "predicted": "the university where albert einstein worked as a professor was not specified in the provided context, but it can be inferred that he worked at a university in princeton, new jersey, given his passing away in princeton. however, the founding year of the university is not provided.",
+      "gold": [
+        "1834"
+      ],
+      "correct": false,
+      "type": "bridge",
+      "level": "medium",
+      "sources": [
+        "Chunk:chunk_45263d487570",
+        "Entity:entity_7b062af0e4e5",
+        "Entity:entity_1c00e9ab93b8"
+      ]
+    },
+    {
+      "id": "bridge_3",
+      "question": "Which programming language was developed by the creator of Python?",
+      "predicted": "python",
+      "gold": [
+        "Python"
+      ],
+      "correct": true,
+      "type": "bridge",
+      "level": "easy",
+      "sources": [
+        "Chunk:chunk_f666eb04958f",
+        "Entity:entity_44912d4ba4b9",
+        "Entity:entity_87c58d405ac6"
+      ]
+    },
+    {
+      "id": "bridge_4",
+      "question": "What is the capital of the country where the Eiffel Tower is located?",
+      "predicted": "the capital of the country where the eiffel tower is located is paris.",
+      "gold": [
+        "Paris"
+      ],
+      "correct": true,
+      "type": "bridge",
+      "level": "easy",
+      "sources": [
+        "Chunk:chunk_411e3d5d438a",
+        "Entity:entity_6203964738e2",
+        "Entity:entity_dcfa0a0fa868"
+      ]
+    },
+    {
+      "id": "comp_1",
+      "question": "Which company was founded first, Apple or Microsoft?",
+      "predicted": "microsoft was founded first.",
+      "gold": [
+        "Microsoft"
+      ],
+      "correct": true,
+      "type": "comparison",
+      "level": "medium",
+      "sources": [
+        "Chunk:chunk_7e74ac4bce40",
+        "Chunk:chunk_773ffa2f5001",
+        "Chunk:chunk_cf1a4aa98fe1"
+      ]
+    },
+    {
+      "id": "comp_2",
+      "question": "Who was born earlier, Isaac Newton or Galileo Galilei?",
+      "predicted": "galileo galilei was born earlier than isaac newton",
+      "gold": [
+        "Galileo Galilei",
+        "Galileo"
+      ],
+      "correct": true,
+      "type": "comparison",
+      "level": "easy",
+      "sources": [
+        "Chunk:chunk_c3bf6da210fc",
+        "Entity:entity_fa48aa63a7d7",
+        "Entity:entity_a6fe5c19d952"
+      ]
+    },
+    {
+      "id": "comp_3",
+      "question": "Which mountain is taller, Mount Everest or K2?",
+      "predicted": "mount everest is taller than k2.",
+      "gold": [
+        "Mount Everest",
+        "Everest"
+      ],
+      "correct": true,
+      "type": "comparison",
+      "level": "easy",
+      "sources": [
+        "Chunk:chunk_44928c1cafd4",
+        "Chunk:chunk_27bab0aecc46"
+      ]
+    },
+    {
+      "id": "comp_4",
+      "question": "Which planet is larger, Jupiter or Saturn?",
+      "predicted": "jupiter is larger than saturn",
+      "gold": [
+        "Jupiter"
+      ],
+      "correct": true,
+      "type": "comparison",
+      "level": "easy",
+      "sources": [
+        "Chunk:chunk_bf92be689c7d",
+        "Chunk:chunk_10587dac1eec"
+      ]
+    },
+    {
+      "id": "comp_5",
+      "question": "Which ocean is deeper, the Atlantic or the Pacific?",
+      "predicted": "the pacific ocean is deeper than the atlantic ocean.",
+      "gold": [
+        "Pacific Ocean",
+        "Pacific"
+      ],
+      "correct": true,
+      "type": "comparison",
+      "level": "medium",
+      "sources": [
+        "Chunk:chunk_cd270d003f4a",
+        "Chunk:chunk_0f717c239404",
+        "Chunk:chunk_90b8d426e812"
+      ]
+    }
+  ]
+}
