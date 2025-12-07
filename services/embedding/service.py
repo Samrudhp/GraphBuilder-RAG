@@ -2,7 +2,7 @@
 Embedding + FAISS Index Service
 
 Handles:
-- BGE-small embeddings generation
+- Text embeddings generation (sentence-transformers)
 - FAISS index creation and management
 - Batch embedding pipeline
 - Chunk-level embedding storage
@@ -18,11 +18,18 @@ from uuid import uuid4
 # Force CPU-only BEFORE importing PyTorch/transformers
 os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '0'
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+os.environ['OMP_NUM_THREADS'] = '1'  # Critical for SentenceTransformer
 
 import faiss
 import numpy as np
 import torch
-from transformers import AutoTokenizer, AutoModel
+from sentence_transformers import SentenceTransformer
+import warnings
+
+# Suppress specific warnings
+warnings.filterwarnings('ignore', category=FutureWarning, module='huggingface_hub')
+warnings.filterwarnings('ignore', category=UserWarning, module='transformers')
 
 # Set default device to CPU immediately
 torch.set_default_device('cpu')
@@ -34,27 +41,55 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingService:
-    """Service for generating text embeddings using BGE-small."""
+    """Service for generating text embeddings using sentence-transformers."""
     
     def __init__(self):
         self.settings = get_settings().embedding
         self.model = None
-        self.tokenizer = None
         
     def _load_model(self):
-        """Lazy load the embedding model."""
+        """Synchronous lazy load using SentenceTransformer."""
         if self.model is None:
             logger.info(f"Loading embedding model: {self.settings.model}")
             
-            # Load model and tokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(self.settings.model)
-            self.model = AutoModel.from_pretrained(self.settings.model)
+            # Check if model is cached
+            from pathlib import Path
+            cache_dir = Path.home() / ".cache" / "torch" / "sentence_transformers" / f"sentence-transformers_{self.settings.model.replace('/', '-')}"
+            is_cached = cache_dir.exists()
             
-            # Ensure model is on CPU and in eval mode
-            self.model = self.model.to('cpu')
-            self.model.eval()
+            if is_cached:
+                logger.info(f"✅ Found cached model at {cache_dir}")
+                logger.info("Loading from cache...")
+            else:
+                logger.info(f"⏳ Downloading {self.settings.model} (first time, ~90MB)...")
             
-            logger.info("Embedding model loaded on CPU")
+            try:
+                # Use SentenceTransformer - handles tokenization + model internally
+                self.model = SentenceTransformer(
+                    self.settings.model,
+                    device='cpu',  # Force CPU to avoid MPS issues
+                    cache_folder=None  # Use default cache
+                )
+                logger.info("✅ Model loaded successfully")
+                
+            except Exception as e:
+                if is_cached:
+                    logger.warning(f"Cache error: {e}, re-downloading...")
+                    # Clear cache and retry
+                    import shutil
+                    if cache_dir.exists():
+                        shutil.rmtree(cache_dir)
+                    self.model = SentenceTransformer(
+                        self.settings.model,
+                        device='cpu'
+                    )
+                    logger.info("✅ Model re-downloaded")
+                else:
+                    raise
+            
+            logger.info(f"✅ Embedding model ready on {self.model.device}")
+            logger.info(f"Max sequence length: {self.model.max_seq_length}")
+            logger.info(f"Embedding dimension: {self.model.get_sentence_embedding_dimension()}")
     
     def embed_text(self, text: str) -> np.ndarray:
         """
@@ -68,30 +103,15 @@ class EmbeddingService:
         """
         self._load_model()
         
-        # Tokenize
-        encoded_input = self.tokenizer(
+        # Use SentenceTransformer.encode() - handles tokenization, pooling, and normalization
+        embedding = self.model.encode(
             text,
-            padding=True,
-            truncation=True,
-            return_tensors='pt',
-            max_length=512
+            convert_to_tensor=False,  # Return numpy array
+            normalize_embeddings=True,  # Already normalized
+            show_progress_bar=False
         )
         
-        # Generate embeddings
-        with torch.no_grad():
-            model_output = self.model(**encoded_input)
-            # Use mean pooling
-            embeddings = self._mean_pooling(model_output, encoded_input['attention_mask'])
-            # Normalize
-            embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
-        
-        return embeddings[0].numpy()
-    
-    def _mean_pooling(self, model_output, attention_mask):
-        """Mean pooling of token embeddings."""
-        token_embeddings = model_output[0]  # First element contains token embeddings
-        input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-        return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+        return embedding
     
     def embed_batch(self, texts: list[str], batch_size: Optional[int] = None) -> np.ndarray:
         """
@@ -99,38 +119,25 @@ class EmbeddingService:
         
         Args:
             texts: List of input texts
-            batch_size: Batch size for processing
+            batch_size: Batch size for processing (SentenceTransformer handles this internally)
             
         Returns:
             Array of embedding vectors (normalized)
         """
         self._load_model()
-        batch_size = batch_size or self.settings.batch_size
         
         logger.debug(f"Embedding batch of {len(texts)} texts")
         
-        all_embeddings = []
-        for i in range(0, len(texts), batch_size):
-            batch_texts = texts[i:i + batch_size]
-            
-            # Tokenize batch
-            encoded_input = self.tokenizer(
-                batch_texts,
-                padding=True,
-                truncation=True,
-                return_tensors='pt',
-                max_length=512
-            )
-            
-            # Generate embeddings
-            with torch.no_grad():
-                model_output = self.model(**encoded_input)
-                embeddings = self._mean_pooling(model_output, encoded_input['attention_mask'])
-                embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
-            
-            all_embeddings.append(embeddings.numpy())
+        # Use SentenceTransformer.encode() - handles batching, tokenization, pooling, and normalization
+        embeddings = self.model.encode(
+            texts,
+            batch_size=batch_size or self.settings.batch_size,
+            convert_to_tensor=False,  # Return numpy array
+            normalize_embeddings=True,  # Already normalized
+            show_progress_bar=False
+        )
         
-        return np.vstack(all_embeddings)
+        return embeddings
 
 
 class FAISSIndexService:
@@ -447,6 +454,9 @@ class EmbeddingPipelineService:
         Returns:
             List of chunk results with metadata
         """
+        # Ensure model is loaded (lazy loading)
+        self.embedding_service._load_model()
+        
         # Generate query embedding
         query_embedding = self.embedding_service.embed_text(query)
         

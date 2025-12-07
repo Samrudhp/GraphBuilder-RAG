@@ -65,7 +65,7 @@ class FEVERBenchmark(BaseBenchmark):
             True if successful
         """
         try:
-            dataset_file = self.data_dir / "fever_dev.jsonl"
+            dataset_file = self.data_dir / "fever_expanded_5000.jsonl"
             
             if dataset_file.exists():
                 logger.info(f"Dataset already downloaded: {dataset_file}")
@@ -168,7 +168,7 @@ class FEVERBenchmark(BaseBenchmark):
         Returns:
             List of FEVER samples
         """
-        dataset_file = self.data_dir / "fever_dev.jsonl"
+        dataset_file = self.data_dir / "fever_expanded_5000.jsonl"
         
         samples = []
         with open(dataset_file) as f:
@@ -261,10 +261,10 @@ class FEVERBenchmark(BaseBenchmark):
         
         # Map system output to FEVER labels
         mapping = {
-            "VERIFIED": "SUPPORTS",
-            "CONTRADICTED": "REFUTES",
-            "INSUFFICIENT_EVIDENCE": "NOT_ENOUGH_INFO",
-            "HALLUCINATION_DETECTED": "REFUTES",
+            "supported": "SUPPORTS",
+            "contradicted": "REFUTES",
+            "unsupported": "REFUTES",
+            "unknown": "NOT_ENOUGH_INFO",
             "ERROR": "NOT_ENOUGH_INFO",
         }
         

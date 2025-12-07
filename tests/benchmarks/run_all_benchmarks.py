@@ -56,6 +56,33 @@ class BenchmarkRunner:
             "summary": {},
         }
     
+    def load_results(self, results_file: Optional[Path] = None) -> bool:
+        """
+        Load results from a JSON file.
+        
+        Args:
+            results_file: Path to results file (default: latest benchmark_results_*.json)
+            
+        Returns:
+            True if results loaded successfully
+        """
+        if results_file is None:
+            # Find the latest results file
+            results_files = list(self.output_dir.glob("benchmark_results_*.json"))
+            if not results_files:
+                logger.error("No benchmark results files found")
+                return False
+            results_file = max(results_files, key=lambda x: x.stat().st_mtime)
+        
+        try:
+            with open(results_file) as f:
+                self.results = json.load(f)
+            logger.info(f"Loaded results from {results_file}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to load results from {results_file}: {e}")
+            return False
+    
     async def run_fever(self, sample_size: int = 1000) -> Dict[str, Any]:
         """Run FEVER benchmark."""
         logger.info("=" * 80)
@@ -269,9 +296,12 @@ class BenchmarkRunner:
         """Generate markdown report."""
         with open(output_path, "w") as f:
             f.write("# GraphBuilder-RAG Benchmark Results\n\n")
-            f.write(f"**Generated:** {self.results['timestamp']}\n\n")
+            f.write(f"**Generated:** {self.results.get('timestamp', datetime.now().isoformat())}\n\n")
             
             f.write("## Summary\n\n")
+            # Ensure summary exists
+            if "summary" not in self.results:
+                self.results["summary"] = self._generate_summary()
             summary = self.results["summary"]
             f.write(f"- **Benchmarks Run:** {summary['num_benchmarks']}\n")
             f.write(f"- **Total Samples:** {summary['total_samples']}\n")
@@ -390,8 +420,12 @@ async def main():
     runner = BenchmarkRunner(output_dir=args.output_dir)
     
     if args.report_only:
-        # Generate report from existing results
-        runner.generate_report()
+        # Load existing results and generate report
+        if runner.load_results():
+            runner.generate_report()
+        else:
+            logger.error("No results to generate report from")
+            return
     else:
         # Determine which datasets to run
         if args.full:

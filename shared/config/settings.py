@@ -64,7 +64,7 @@ class GroqSettings(BaseSettings):
 
 class EmbeddingSettings(BaseSettings):
     """Embedding model configuration."""
-    model: str = Field(default="BAAI/bge-small-en-v1.5")
+    model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")
     dimension: int = Field(default=384)
     batch_size: int = Field(default=32)
     device: str = Field(default="cpu")

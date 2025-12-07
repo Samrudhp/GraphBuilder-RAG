@@ -1,6 +1,6 @@
 # GraphBuilder-RAG Benchmark Results
 
-**Generated:** 2025-12-07T10:58:01.168678
+**Generated:** 2025-12-07T11:07:02.458871
 
 ## Summary
 

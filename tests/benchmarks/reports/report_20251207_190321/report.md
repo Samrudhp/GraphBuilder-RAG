@@ -1,6 +1,6 @@
 # GraphBuilder-RAG Benchmark Results
 
-**Generated:** 2025-12-07T10:57:05.063088
+**Generated:** 2025-12-07T18:56:08.346677
 
 ## Summary
 
@@ -12,19 +12,19 @@
 
 | Metric | Value |
 |--------|-------|
-| accuracy | 0.0000 |
-| precision | 0.0000 |
-| recall | 0.0000 |
-| f1 | 0.0000 |
+| accuracy | 0.8090 |
+| precision | 0.2697 |
+| recall | 0.3333 |
+| f1 | 0.2981 |
 | supports_precision | 0.0000 |
 | supports_recall | 0.0000 |
 | supports_f1 | 0.0000 |
 | refutes_precision | 0.0000 |
 | refutes_recall | 0.0000 |
 | refutes_f1 | 0.0000 |
-| not_enough_info_precision | 0.0000 |
-| not_enough_info_recall | 0.0000 |
-| not_enough_info_f1 | 0.0000 |
+| not_enough_info_precision | 0.8090 |
+| not_enough_info_recall | 1.0000 |
+| not_enough_info_f1 | 0.8944 |
 
 ## Individual Benchmark Results
 
@@ -37,17 +37,17 @@
 
 | Metric | Value |
 |--------|-------|
-| accuracy | 0.0000 |
-| precision | 0.0000 |
-| recall | 0.0000 |
-| f1 | 0.0000 |
+| accuracy | 0.8090 |
+| precision | 0.2697 |
+| recall | 0.3333 |
+| f1 | 0.2981 |
 | supports_precision | 0.0000 |
 | supports_recall | 0.0000 |
 | supports_f1 | 0.0000 |
 | refutes_precision | 0.0000 |
 | refutes_recall | 0.0000 |
 | refutes_f1 | 0.0000 |
-| not_enough_info_precision | 0.0000 |
-| not_enough_info_recall | 0.0000 |
-| not_enough_info_f1 | 0.0000 |
+| not_enough_info_precision | 0.8090 |
+| not_enough_info_recall | 1.0000 |
+| not_enough_info_f1 | 0.8944 |
 

@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
         neo4j.create_constraints_and_indexes()
     
     # Initialize FAISS index
-    from services.embedding.service import FAISSIndexService
+    from services.embedding.service import FAISSIndexService, EmbeddingPipelineService
     faiss_service = FAISSIndexService()
     try:
         faiss_service.load_index()
@@ -106,13 +106,29 @@ async def lifespan(app: FastAPI):
         logger.info("Creating new FAISS index")
         faiss_service.create_index()
     
-    # Verify Groq API key
+    # Verify Groq API key first
     from shared.utils.groq_client import get_groq_client
     try:
         groq = get_groq_client()
         logger.info(f"Groq client ready with model: {groq.model}")
     except Exception as e:
         logger.error(f"Groq client initialization failed: {e}")
+    
+    # Preload embedding model at startup (now using SentenceTransformer - no segfault)
+    logger.info("Preloading embedding model at startup...")
+    try:
+        from services.embedding.service import EmbeddingService
+        import time
+        
+        start = time.time()
+        embedding_service = EmbeddingService()
+        embedding_service._load_model()  # Synchronous load with SentenceTransformer
+        elapsed = time.time() - start
+        
+        logger.info(f"✅ Embedding model preloaded in {elapsed:.2f}s")
+    except Exception as e:
+        logger.error(f"Failed to preload embedding model: {e}")
+        logger.warning("Model will be loaded on first query")
     
     logger.info("API server ready")
     
@@ -140,6 +156,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Load embedding model after server startup to avoid segfault."""
+    logger.info("🔄 Loading embedding model in background...")
+    try:
+        from services.embedding.service import EmbeddingService
+        import time
+        
+        start = time.time()
+        # Create global embedding service instance
+        global embedding_service
+        embedding_service = EmbeddingService()
+        embedding_service._load_model()
+        elapsed = time.time() - start
+        
+        logger.info(f"✅ Embedding model loaded in {elapsed:.2f}s")
+    except Exception as e:
+        logger.error(f"❌ Failed to load embedding model: {e}")
+        logger.warning("Model will load on first query")
 
 
 # Middleware for metrics
