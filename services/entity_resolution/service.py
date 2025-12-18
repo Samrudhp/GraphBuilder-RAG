@@ -7,6 +7,7 @@ Handles:
 - Provisional entity creation
 - Entity merging and canonicalization
 """
+import asyncio
 import logging
 from typing import Optional
 from uuid import uuid4
@@ -45,7 +46,7 @@ class EntityResolutionService:
         1. Check for exact alias match in Neo4j
         2. Check provisional entities in MongoDB
         3. Use FAISS similarity search
-        4. Create new entity if no match
+        4. Create new entity if no match (with locking to prevent duplicates)
         
         Args:
             name: Entity name
@@ -69,7 +70,12 @@ class EntityResolutionService:
         })
         if provisional and provisional.get("resolved_to"):
             logger.debug(f"Found in provisional entities: {provisional['resolved_to']}")
-            return provisional["resolved_to"]
+            # Double-check Neo4j to ensure entity exists
+            verify_id = self._check_neo4j_exact_match(provisional["resolved_to"])
+            if verify_id:
+                return verify_id
+            else:
+                logger.warning(f"Provisional entity {provisional['resolved_to']} not found in Neo4j, recreating")
         
         # Step 3: FAISS similarity search
         similar_entities = await self._find_similar_entities(name)
@@ -85,11 +91,49 @@ class EntityResolutionService:
                 
                 return best_match["entity_id"]
         
-        # Step 4: Create new entity
-        new_entity_id = await self._create_entity(name, entity_type)
-        logger.debug(f"Created new entity: {new_entity_id}")
+        # Step 4: Create new entity with locking to prevent race conditions
+        # Try to acquire lock by inserting provisional entity first
+        import time
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Try to insert provisional entity (unique constraint on name)
+                temp_id = f"entity_{uuid4().hex[:12]}"
+                await self.provisional_entities.insert_one({
+                    "name": name,
+                    "entity_id": temp_id,
+                    "resolution_status": "creating",
+                    "created_at": time.time()
+                })
+                
+                # We got the lock, create the entity
+                new_entity_id = await self._create_entity(name, entity_type)
+                logger.debug(f"Created new entity: {new_entity_id}")
+                
+                # Update provisional entity with final ID
+                await self.provisional_entities.update_one(
+                    {"name": name, "entity_id": temp_id},
+                    {"$set": {"entity_id": new_entity_id, "resolution_status": "resolved", "resolved_to": new_entity_id}}
+                )
+                
+                return new_entity_id
+                
+            except Exception as e:
+                # Another task is creating this entity, wait and retry
+                if "duplicate" in str(e).lower() or attempt < max_retries - 1:
+                    logger.debug(f"Entity creation conflict for '{name}', retrying... (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(0.5 * (attempt + 1))  # Exponential backoff
+                    
+                    # Check if entity was created by other task
+                    entity_id = self._check_neo4j_exact_match(name)
+                    if entity_id:
+                        logger.debug(f"Entity created by another task: {entity_id}")
+                        return entity_id
+                else:
+                    logger.error(f"Failed to create entity '{name}' after {max_retries} attempts: {e}")
+                    raise
         
-        return new_entity_id
+        raise RuntimeError(f"Failed to resolve entity '{name}' after all retries")
     
     def _check_neo4j_exact_match(self, name: str) -> Optional[str]:
         """Check Neo4j for exact entity name match."""
@@ -215,25 +259,51 @@ class EntityResolutionService:
         """Create new entity in Neo4j."""
         entity_id = f"entity_{uuid4().hex[:12]}"
         
-        # Upsert in Neo4j
-        self.neo4j.upsert_entity(
-            entity_id=entity_id,
-            canonical_name=name,
-            entity_type=entity_type.value if entity_type else "Other",
-            aliases=[],
-            attributes={},
-        )
+        try:
+            # Upsert in Neo4j
+            logger.info(f"Creating entity in Neo4j: {entity_id} ({name})")
+            result = self.neo4j.upsert_entity(
+                entity_id=entity_id,
+                canonical_name=name,
+                entity_type=entity_type.value if entity_type else "Other",
+                aliases=[],
+                attributes={},
+            )
+            logger.info(f"Entity created successfully: {entity_id} - {result}")
+            
+            # Verify entity exists immediately (force read-your-writes consistency)
+            with self.neo4j.get_session() as session:
+                verify = session.run(
+                    "MATCH (e:Entity {entity_id: $id}) RETURN e.canonical_name AS name",
+                    id=entity_id
+                ).single()
+                
+                if not verify:
+                    logger.error(f"Entity {entity_id} not found immediately after creation!")
+                    raise RuntimeError(f"Failed to verify entity {entity_id} creation")
+                    
+                logger.info(f"Entity verified in Neo4j: {entity_id} -> {verify['name']}")
+            
+        except Exception as e:
+            logger.error(f"Failed to create entity {entity_id} in Neo4j: {e}", exc_info=True)
+            raise
         
-        # Create provisional entry
-        provisional = ProvisionalEntity(
-            entity_id=entity_id,
-            name=name,
-            entity_type=entity_type,
-            source_triple_ids=[],
-            resolution_status="resolved",
-            resolved_to=entity_id,
-        )
-        
-        await self.provisional_entities.insert_one(provisional.model_dump())
+        try:
+            # Create provisional entry
+            provisional = ProvisionalEntity(
+                entity_id=entity_id,
+                name=name,
+                entity_type=entity_type,
+                source_triple_ids=[],
+                resolution_status="resolved",
+                resolved_to=entity_id,
+            )
+            
+            await self.provisional_entities.insert_one(provisional.model_dump())
+            logger.debug(f"Provisional entity created: {entity_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to create provisional entity {entity_id}: {e}", exc_info=True)
+            # Don't raise - Neo4j entity already created
         
         return entity_id

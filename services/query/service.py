@@ -101,81 +101,78 @@ class HybridRetrievalService:
         nl2cypher_result = None
         nl2cypher_success = False
         
+        # FIRST: Try simple direct query (most reliable)
         try:
-            # Generate Cypher query from natural language using LLM
-            logger.info(f"Attempting NL2Cypher for query: {query}")
-            nl2cypher_result = await self._generate_cypher_query(
-                question=query,
-                domain="general",
-            )
-            
-            if nl2cypher_result and nl2cypher_result.get("cypher"):
-                logger.info(f"NL2Cypher generated: {nl2cypher_result.get('cypher')}")
-                logger.info(f"NL2Cypher parameters: {nl2cypher_result.get('parameters', {})}")
-                # Execute LLM-generated Cypher query
-                subgraph = await self._execute_cypher_query(
-                    cypher=nl2cypher_result["cypher"],
-                    parameters=nl2cypher_result.get("parameters", {}),
-                )
-                
-                if subgraph and (subgraph.get("nodes") or subgraph.get("relationships")):
-                    graph_match = GraphMatch(
-                        subgraph=subgraph,
-                        relevance_score=0.9,  # High score for LLM-generated queries
-                        node_count=len(subgraph.get("nodes", [])),
-                        edge_count=len(subgraph.get("relationships", [])),
-                    )
-                    graphs.append(graph_match)
-                    nl2cypher_success = True
-                    
-                    logger.info(
-                        f"NL2Cypher retrieved: {graph_match.node_count} nodes, "
-                        f"{graph_match.edge_count} edges - {nl2cypher_result.get('explanation')}"
-                    )
-                else:
-                    logger.warning("NL2Cypher returned empty subgraph, will try entity extraction fallback")
-            else:
-                logger.warning("NL2Cypher did not generate a valid Cypher query, will try entity extraction fallback")
-        except Exception as e:
-            logger.warning(f"NL2Cypher failed with exception, will try entity extraction fallback: {e}", exc_info=True)
-        
-        # Try entity extraction fallback if NL2Cypher didn't return results
-        if not nl2cypher_success:
-            logger.info("Attempting entity extraction fallback")
+            logger.info(f"Attempting direct entity query for: {query}")
             query_entities = self._extract_entities_simple(query)
             
             if query_entities:
                 entity_ids = self._find_entity_ids(query_entities)
                 
                 if entity_ids:
-                    logger.info(f"Fetching subgraph for entity IDs: {entity_ids} with depth={graph_depth}, min_confidence={self.settings.min_similarity}")
+                    logger.info(f"Direct query: Fetching subgraph for {len(entity_ids)} entities")
                     subgraph = self.neo4j.get_subgraph(
                         entity_ids=entity_ids,
                         depth=graph_depth,
                         min_confidence=self.settings.min_similarity,
                     )
                     
-                    logger.info(f"Subgraph retrieved: {len(subgraph.get('nodes', []))} nodes, {len(subgraph.get('relationships', []))} relationships")
-                    
-                    if subgraph["nodes"] or subgraph["relationships"]:
+                    if subgraph and (subgraph.get("nodes") or subgraph.get("relationships")):
                         graph_match = GraphMatch(
                             subgraph=subgraph,
-                            relevance_score=0.7,  # Lower score for fallback
-                            node_count=len(subgraph["nodes"]),
-                            edge_count=len(subgraph["relationships"]),
+                            relevance_score=0.85,  # High score for direct entity match
+                            node_count=len(subgraph.get("nodes", [])),
+                            edge_count=len(subgraph.get("relationships", [])),
                         )
                         graphs.append(graph_match)
+                        nl2cypher_success = True
                         
                         logger.info(
-                            f"Fallback entity retrieval: {graph_match.node_count} nodes, "
+                            f"Direct query retrieved: {graph_match.node_count} nodes, "
                             f"{graph_match.edge_count} edges"
                         )
+        except Exception as e:
+            logger.warning(f"Direct entity query failed: {e}", exc_info=True)
+        
+        # SECOND: Try NL2Cypher if direct query didn't work
+        if not nl2cypher_success:
+            try:
+                # Generate Cypher query from natural language using LLM
+                logger.info(f"Attempting NL2Cypher for query: {query}")
+                nl2cypher_result = await self._generate_cypher_query(
+                    question=query,
+                    domain="general",
+                )
+                
+                if nl2cypher_result and nl2cypher_result.get("cypher"):
+                    logger.info(f"NL2Cypher generated: {nl2cypher_result.get('cypher')}")
+                    logger.info(f"NL2Cypher parameters: {nl2cypher_result.get('parameters', {})}")
+                    # Execute LLM-generated Cypher query
+                    subgraph = await self._execute_cypher_query(
+                        cypher=nl2cypher_result["cypher"],
+                        parameters=nl2cypher_result.get("parameters", {}),
+                    )
+                    
+                    if subgraph and (subgraph.get("nodes") or subgraph.get("relationships")):
+                        graph_match = GraphMatch(
+                            subgraph=subgraph,
+                            relevance_score=0.9,  # High score for LLM-generated queries
+                            node_count=len(subgraph.get("nodes", [])),
+                            edge_count=len(subgraph.get("relationships", [])),
+                        )
+                        graphs.append(graph_match)
+                        nl2cypher_success = True
+                        
+                        logger.info(
+                            f"NL2Cypher retrieved: {graph_match.node_count} nodes, "
+                            f"{graph_match.edge_count} edges - {nl2cypher_result.get('explanation')}"
+                        )
                     else:
-                        logger.warning("Entity extraction fallback returned empty subgraph")
+                        logger.warning("NL2Cypher returned empty subgraph")
                 else:
-                    logger.warning(f"No entity IDs found for entities: {query_entities}")
-            else:
-                logger.warning(f"No entities extracted from query: {query}")
+                    logger.warning("NL2Cypher did not generate a valid Cypher query")
+            except Exception as e:
+                logger.warning(f"NL2Cypher failed with exception: {e}", exc_info=True)
         
         # Step 3: Compute combined score
         semantic_weight = self.settings.semantic_weight
@@ -274,7 +271,34 @@ class HybridRetrievalService:
                 for record in result:
                     # Extract nodes and relationships from the record
                     for key, value in record.items():
-                        if hasattr(value, 'labels'):  # It's a node
+                        # Handle paths
+                        if hasattr(value, 'nodes') and hasattr(value, 'relationships'):
+                            # It's a path object
+                            for node in value.nodes:
+                                node_id = node.element_id
+                                if node_id not in seen_nodes:
+                                    nodes.append({
+                                        "entity_id": node.get("entity_id", node_id),
+                                        "canonical_name": node.get("canonical_name", ""),
+                                        "entity_type": node.get("entity_type", "Entity"),
+                                        "aliases": node.get("aliases", []),
+                                    })
+                                    seen_nodes.add(node_id)
+                            
+                            for rel in value.relationships:
+                                rel_id = rel.element_id
+                                if rel_id not in seen_rels:
+                                    relationships.append({
+                                        "edge_id": rel.get("edge_id", rel_id),
+                                        "source_id": rel.start_node.get("entity_id"),
+                                        "target_id": rel.end_node.get("entity_id"),
+                                        "relationship_type": rel.type,
+                                        "confidence": rel.get("confidence", 0.5),
+                                        "evidence_ids": rel.get("evidence_ids", []),
+                                    })
+                                    seen_rels.add(rel_id)
+                        
+                        elif hasattr(value, 'labels'):  # It's a node
                             node_id = value.element_id
                             if node_id not in seen_nodes:
                                 nodes.append({
@@ -297,6 +321,34 @@ class HybridRetrievalService:
                                     "evidence_ids": value.get("evidence_ids", []),
                                 })
                                 seen_rels.add(rel_id)
+                        
+                        # Handle lists of nodes/relationships
+                        elif isinstance(value, list):
+                            for item in value:
+                                if hasattr(item, 'labels'):  # Node
+                                    node_id = item.element_id
+                                    if node_id not in seen_nodes:
+                                        nodes.append({
+                                            "entity_id": item.get("entity_id", node_id),
+                                            "canonical_name": item.get("canonical_name", ""),
+                                            "entity_type": item.get("entity_type", "Entity"),
+                                            "aliases": item.get("aliases", []),
+                                        })
+                                        seen_nodes.add(node_id)
+                                elif hasattr(item, 'type'):  # Relationship
+                                    rel_id = item.element_id
+                                    if rel_id not in seen_rels:
+                                        relationships.append({
+                                            "edge_id": item.get("edge_id", rel_id),
+                                            "source_id": item.start_node.get("entity_id"),
+                                            "target_id": item.end_node.get("entity_id"),
+                                            "relationship_type": item.type,
+                                            "confidence": item.get("confidence", 0.5),
+                                            "evidence_ids": item.get("evidence_ids", []),
+                                        })
+                                        seen_rels.add(rel_id)
+                
+                logger.info(f"Cypher execution: {len(nodes)} nodes, {len(relationships)} relationships")
                 
                 return {
                     "nodes": nodes,
@@ -320,39 +372,44 @@ class HybridRetrievalService:
         # Remove possessive 's to avoid "Einstein's" being different from "Einstein"
         clean_query = re.sub(r"'s\b", "", query)
         
-        # Find capitalized phrases (e.g., "Albert Einstein")
-        # Limit to 2-3 words to avoid capturing full sentences
-        capitalized_patterns = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b", clean_query)
-        entities.extend(capitalized_patterns)
+        # Find capitalized phrases (e.g., "Albert Einstein", "Nobel Prize")
+        # This catches proper nouns which are usually entities
+        capitalized_patterns = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}\b", clean_query)
         
-        # Also find common patterns even if lowercase (for queries like "who was isaac newton")
-        # Match exactly 2 or 3 consecutive words that might be names
-        lowercase_query = clean_query.lower()
-        
-        # Extract 2-word patterns
-        two_word_patterns = re.findall(r"\b([a-z]+\s+[a-z]+)\b", lowercase_query)
-        
-        # Extract 3-word patterns
-        three_word_patterns = re.findall(r"\b([a-z]+\s+[a-z]+\s+[a-z]+)\b", lowercase_query)
-        
-        # Common stop words to skip
+        # Aggressive stop words and common words to filter
         stop_words = {
             'was', 'is', 'the', 'and', 'but', 'for', 'who', 'what', 'where', 'when', 
             'why', 'how', 'did', 'won', 'which', 'have', 'has', 'had', 'about', 'this',
-            'that', 'from', 'with', 'are', 'were', 'been', 'being', 'have', 'his', 'her',
-            'their', 'your', 'our', 'work', 'works', 'award', 'awards', 'prize'
+            'that', 'from', 'with', 'are', 'were', 'been', 'being', 'his', 'her',
+            'their', 'your', 'our', 'work', 'works', 'award', 'awards', 'prize',
+            'in', 'on', 'at', 'to', 'of', 'by', 'as'
         }
         
-        # Process patterns
-        for pattern in two_word_patterns + three_word_patterns:
-            words = pattern.split()
-            # Skip if starts with stop word or ends with common noun
-            if words[0] not in stop_words and words[-1] not in stop_words:
-                # Capitalize to match Neo4j format
-                capitalized = ' '.join(word.capitalize() for word in words)
+        # Filter capitalized patterns to remove noise
+        for pattern in capitalized_patterns:
+            words = pattern.lower().split()
+            # Only keep if:
+            # 1. Not a single common word
+            # 2. Doesn't contain only stop words
+            # 3. Has at least one meaningful word
+            if len(words) == 1 and words[0] in stop_words:
+                continue
+            if all(w in stop_words for w in words):
+                continue
+            
+            # Remove leading/trailing stop words
+            while words and words[0] in stop_words:
+                words.pop(0)
+            while words and words[-1] in stop_words:
+                words.pop()
+            
+            if words:  # If anything left after filtering
+                cleaned = ' '.join(words)
+                # Capitalize properly
+                capitalized = ' '.join(word.capitalize() for word in cleaned.split())
                 entities.append(capitalized)
         
-        # Deduplicate and clean
+        # Deduplicate
         entities = list(set(entities))
         
         # Remove entities that are substrings of others (keep longer ones)
@@ -370,45 +427,29 @@ class HybridRetrievalService:
         
         with self.neo4j.get_session() as session:
             for name in entity_names:
-                # Try exact match first (case-insensitive)
+                # Try CONTAINS match first (most flexible)
                 result = session.run(
                     """
                     MATCH (e:Entity)
-                    WHERE toLower(e.canonical_name) = toLower($name) 
-                       OR ANY(alias IN e.aliases WHERE toLower(alias) = toLower($name))
+                    WHERE toLower(e.canonical_name) CONTAINS toLower($name) 
+                       OR ANY(alias IN e.aliases WHERE toLower(alias) CONTAINS toLower($name))
                     RETURN e.entity_id AS entity_id, e.canonical_name AS canonical_name
-                    LIMIT 1
+                    ORDER BY size(e.canonical_name) ASC
+                    LIMIT 5
                     """,
                     name=name,
                 )
-                record = result.single()
+                records = list(result)
                 
-                # If exact match fails, try partial CONTAINS match for typos
-                if not record:
-                    logger.info(f"Exact match failed for '{name}', trying partial match...")
-                    # For multi-word names, try matching individual words
-                    words = name.split()
-                    if len(words) >= 2:
-                        # Try matching with at least 2 words from the name
-                        result = session.run(
-                            """
-                            MATCH (e:Entity)
-                            WHERE ALL(word IN $words WHERE toLower(e.canonical_name) CONTAINS toLower(word))
-                            RETURN e.entity_id AS entity_id, e.canonical_name AS canonical_name
-                            ORDER BY size(e.canonical_name) ASC
-                            LIMIT 1
-                            """,
-                            words=words,
-                        )
-                        record = result.single()
-                
-                if record:
-                    entity_ids.append(record["entity_id"])
-                    logger.info(f"Found entity: '{name}' -> '{record['canonical_name']}' (ID: {record['entity_id']})")
+                if records:
+                    # Take all matches (up to 5) for better coverage
+                    for record in records:
+                        entity_ids.append(record["entity_id"])
+                        logger.info(f"Matched '{name}' → '{record['canonical_name']}' ({record['entity_id']})")
                 else:
-                    logger.warning(f"Entity not found in Neo4j: '{name}'")
+                    logger.warning(f"No match found for entity: '{name}'")
         
-        logger.info(f"Extracted {len(entity_ids)} entity IDs from {len(entity_names)} names")
+        logger.info(f"Found {len(entity_ids)} entity IDs: {entity_ids}")
         return entity_ids
 
 
@@ -594,10 +635,20 @@ class QueryService:
                 system_prompt=QA_SYSTEM_PROMPT,
                 user_prompt=qa_prompt,
                 temperature=request.temperature,
-                max_tokens=self.settings.max_tokens,
+                max_tokens=2048,  # Ensure enough tokens for full answer
             )
             
             answer_raw = groq_response.get("response", "")
+            
+            # Clean response - remove markdown code blocks if present
+            answer_raw = answer_raw.strip()
+            if answer_raw.startswith("```json"):
+                answer_raw = answer_raw[7:]  # Remove ```json
+            if answer_raw.startswith("```"):
+                answer_raw = answer_raw[3:]  # Remove ```
+            if answer_raw.endswith("```"):
+                answer_raw = answer_raw[:-3]  # Remove trailing ```
+            answer_raw = answer_raw.strip()
             
             # Parse the JSON response from LLM
             answer_obj = {}
@@ -649,11 +700,24 @@ class QueryService:
             verified_edges = []
             contradicted_edges = []
             
+            # If no claims extracted, create one from the answer
+            if not claims and answer:
+                logger.info("No claims extracted, creating default claim from answer")
+                claims = [{
+                    "claim": str(answer)[:200],  # First 200 chars of answer
+                    "evidence_type": "mixed",
+                    "evidence_ids": sources,
+                    "confidence": 0.7
+                }]
+            
             if request.require_verification and claims:
+                logger.info(f"Running GraphVerify on {len(claims)} claims")
                 verification_result = await self.graphverify.verify(
                     claims=claims,
                     retrieval_result=retrieval_result,
                 )
+                
+                logger.info(f"GraphVerify result: {verification_result.get('overall_status', 'UNKNOWN')}, score: {verification_result.get('verification_score', 0.0)}")
                 
                 overall_status = verification_result.get("overall_status", "UNKNOWN")
                 
@@ -677,13 +741,32 @@ class QueryService:
             end_time = datetime.utcnow()
             processing_time_ms = int((end_time - start_time).total_seconds() * 1000)
             
+            # Calculate confidence score
+            confidence_score = 0.5  # Default baseline
+            
+            if verification_result:
+                # Use GraphVerify score if available
+                confidence_score = verification_result.get("verification_score", 0.5)
+                # Set minimum floor - never below 0.5 if we have any retrieval results
+                if (retrieval_result.graphs or retrieval_result.chunks) and confidence_score < 0.5:
+                    confidence_score = 0.5
+            elif retrieval_result.graphs and retrieval_result.chunks:
+                # Has both graph and text - medium-high confidence
+                confidence_score = 0.7
+            elif retrieval_result.graphs:
+                # Has graph only - medium confidence
+                confidence_score = 0.65
+            elif retrieval_result.chunks:
+                # Has text only - medium-low confidence
+                confidence_score = 0.55
+            
             # Build response
             response = QueryResponse(
                 query_id=query_id,
                 question=request.question,
                 answer=answer_obj,  # Return the full structured object
                 verification_status=verification_status,
-                confidence=verification_result.get("verification_score", 0.5) if verification_result else 0.5,
+                confidence=confidence_score,
                 sources=sources,
                 reasoning_trace=reasoning_trace,
                 verified_edges=verified_edges,

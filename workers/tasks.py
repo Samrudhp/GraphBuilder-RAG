@@ -23,16 +23,6 @@ from shared.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Create a single event loop for all async operations (Windows fix)
-try:
-    _event_loop = asyncio.get_event_loop()
-    if _event_loop.is_closed():
-        _event_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(_event_loop)
-except RuntimeError:
-    _event_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(_event_loop)
-
 # Initialize Celery
 settings = get_settings()
 celery_app = Celery(
@@ -53,6 +43,20 @@ celery_app.conf.update(
 )
 
 
+def get_event_loop():
+    """Get or create event loop for async tasks (Windows fix)."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        return loop
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop
+
+
 @celery_app.task(name="normalize_document", bind=True, max_retries=3)
 def normalize_document(self, document_id: str):
     """
@@ -67,7 +71,8 @@ def normalize_document(self, document_id: str):
         from services.normalization.service import NormalizationService
         
         service = NormalizationService()
-        result = _event_loop.run_until_complete(service.normalize_document(document_id))
+        loop = get_event_loop()
+        result = loop.run_until_complete(service.normalize_document(document_id))
         
         logger.info(f"Document normalized: {result.document_id}")
         return {
@@ -96,7 +101,8 @@ def extract_triples(self, document_id: str):
         from services.extraction.service import ExtractionService
         
         service = ExtractionService()
-        results = _event_loop.run_until_complete(service.extract_from_document(document_id))
+        loop = get_event_loop()
+        results = loop.run_until_complete(service.extract_from_document(document_id))
         
         logger.info(f"Extracted {len(results)} triples from {document_id}")
         return {
@@ -124,7 +130,8 @@ def validate_triples(self, document_id: str):
         from services.validation.service import ValidationEngine
         
         engine = ValidationEngine()
-        results = _event_loop.run_until_complete(engine.validate_document_triples(document_id))
+        loop = get_event_loop()
+        results = loop.run_until_complete(engine.validate_document_triples(document_id))
         
         accepted = [v for v in results if v.status.value == "validated"]
         
@@ -157,7 +164,8 @@ def fuse_triples(self, document_id: str):
         from services.fusion.service import FusionService
         
         service = FusionService()
-        results = _event_loop.run_until_complete(service.fuse_document_triples(document_id))
+        loop = get_event_loop()
+        results = loop.run_until_complete(service.fuse_document_triples(document_id))
         
         logger.info(f"Fused {len(results)} edges into knowledge graph")
         
@@ -192,9 +200,9 @@ def embed_document(self, document_id: str):
         
         from services.embedding.service import EmbeddingPipelineService
         
-        # Use the global event loop (Windows fix)
         service = EmbeddingPipelineService()
-        num_chunks = _event_loop.run_until_complete(service.embed_document(document_id))
+        loop = get_event_loop()
+        num_chunks = loop.run_until_complete(service.embed_document(document_id))
         
         # Save FAISS index periodically
         service.faiss_service.save_index()

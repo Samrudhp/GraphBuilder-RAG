@@ -128,7 +128,8 @@ class Neo4jConnector:
                 aliases=aliases or [],
                 attributes=attributes or {},
             )
-            record = result.single()
+            records = list(result)
+            record = records[0] if records else None
             return dict(record["e"]) if record else {}
     
     def upsert_relationship(
@@ -161,15 +162,19 @@ class Neo4jConnector:
         with self.get_session() as session:
             # Ensure entities exist - but they must already have canonical_name from upsert_entity
             # Just verify they exist, don't create empty entities
-            source_check = session.run(
-                "MATCH (e:Entity {entity_id: $entity_id}) RETURN e.canonical_name AS name",
+            source_result = session.run(
+                "MATCH (e:Entity {entity_id: $entity_id}) RETURN e.canonical_name AS name LIMIT 1",
                 entity_id=source_id
-            ).single()
+            )
+            source_records = list(source_result)
+            source_check = source_records[0] if source_records else None
             
-            target_check = session.run(
-                "MATCH (e:Entity {entity_id: $entity_id}) RETURN e.canonical_name AS name",
+            target_result = session.run(
+                "MATCH (e:Entity {entity_id: $entity_id}) RETURN e.canonical_name AS name LIMIT 1",
                 entity_id=target_id
-            ).single()
+            )
+            target_records = list(target_result)
+            target_check = target_records[0] if target_records else None
             
             if not source_check or not target_check:
                 raise ValueError(
@@ -207,7 +212,8 @@ class Neo4jConnector:
                 version=version,
                 properties=properties or {},
             )
-            record = result.single()
+            records = list(result)
+            record = records[0] if records else None
             return dict(record["r"]) if record else {}
     
     def get_subgraph(
@@ -228,27 +234,33 @@ class Neo4jConnector:
             Subgraph with nodes and edges
         """
         with self.get_session() as session:
-            # Depth must be hardcoded in the query, not a parameter
+            # Fixed query to properly aggregate and return single record
             query = f"""
             MATCH path = (start:Entity)-[r*1..{depth}]-(end:Entity)
             WHERE start.entity_id IN $entity_ids
                 AND ALL(rel IN relationships(path) WHERE rel.confidence >= $min_confidence)
-            WITH nodes(path) AS path_nodes, relationships(path) AS path_rels
-            UNWIND path_nodes AS node
-            WITH COLLECT(DISTINCT node) AS all_nodes, path_rels
-            UNWIND path_rels AS rel_list
+            WITH COLLECT(DISTINCT path) AS all_paths
+            UNWIND all_paths AS p
+            WITH COLLECT(DISTINCT nodes(p)) AS node_lists,
+                 COLLECT(DISTINCT relationships(p)) AS rel_lists
+            UNWIND node_lists AS node_list
+            UNWIND node_list AS node
+            WITH COLLECT(DISTINCT node) AS all_nodes, rel_lists
+            UNWIND rel_lists AS rel_list
             UNWIND rel_list AS rel
-            RETURN 
-                all_nodes AS nodes,
-                COLLECT(DISTINCT rel) AS relationships
+            WITH all_nodes, COLLECT(DISTINCT rel) AS all_rels
+            RETURN all_nodes AS nodes, all_rels AS relationships
             """
             result = session.run(
                 query,
                 entity_ids=entity_ids,
                 min_confidence=min_confidence,
             )
-            record = result.single()
-            if record:
+            
+            # Use data() to get all records, then take first
+            records = list(result)
+            if records:
+                record = records[0]
                 nodes = [dict(n) for n in record["nodes"]] if record["nodes"] else []
                 relationships = [dict(r) for r in record["relationships"]] if record["relationships"] else []
                 return {

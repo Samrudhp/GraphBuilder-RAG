@@ -66,15 +66,19 @@ class FusionService:
         from services.entity_resolution.service import EntityResolutionService
         resolver = EntityResolutionService()
         
+        logger.debug(f"Resolving source entity: {triple.subject} ({triple.subject_type})")
         source_entity_id = await resolver.resolve_entity(
             name=triple.subject,
             entity_type=triple.subject_type,
         )
+        logger.info(f"Source entity resolved: {triple.subject} -> {source_entity_id}")
         
+        logger.debug(f"Resolving target entity: {triple.object} ({triple.object_type})")
         target_entity_id = await resolver.resolve_entity(
             name=triple.object,
             entity_type=triple.object_type,
         )
+        logger.info(f"Target entity resolved: {triple.object} -> {target_entity_id}")
         
         # Step 2: Check for existing edge
         existing_edges = self.neo4j.find_conflicting_edges(
@@ -107,6 +111,31 @@ class FusionService:
         
         # Step 5: Upsert into Neo4j
         evidence_ids = [ev.document_id for ev in validated.evidence]
+        
+        # Verify entities exist before creating relationship
+        logger.debug(f"Verifying entities exist: source={source_entity_id}, target={target_entity_id}")
+        with self.neo4j.get_session() as session:
+            source_exists = session.run(
+                "MATCH (e:Entity {entity_id: $id}) RETURN count(e) AS count",
+                id=source_entity_id
+            ).single()["count"] > 0
+            
+            target_exists = session.run(
+                "MATCH (e:Entity {entity_id: $id}) RETURN count(e) AS count",
+                id=target_entity_id
+            ).single()["count"] > 0
+            
+            if not source_exists or not target_exists:
+                logger.error(
+                    f"Entities missing before upsert! "
+                    f"Source {source_entity_id} exists: {source_exists}, "
+                    f"Target {target_entity_id} exists: {target_exists}"
+                )
+                raise ValueError(
+                    f"Entities must exist. Source exists: {source_exists}, Target exists: {target_exists}"
+                )
+        
+        logger.debug(f"Both entities verified to exist")
         
         relationship_props = self.neo4j.upsert_relationship(
             edge_id=edge_id,
