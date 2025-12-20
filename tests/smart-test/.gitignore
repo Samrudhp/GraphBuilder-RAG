@@ -1,0 +1,44 @@
+# Test Results - Evaluation Outputs
+evaluation_results-2/
+evaluation_results/
+retrieved_contexts/
+
+# Metrics and Analysis
+metrics/
+*.json
+*.tex
+
+# Visualizations
+visualizations/
+*.png
+*.pdf
+
+# Logs
+*.log
+retrieval.log
+
+# Cache and backups
+backups/
+__pycache__/
+*.pyc
+.DS_Store
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Data files
+data/
+datasets/
+*.faiss
+*.csv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Virtual Environment
+venv/
+env/

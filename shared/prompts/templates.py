@@ -62,14 +62,14 @@ NL2CYPHER_SYSTEM_PROMPT = """You are an expert at converting natural language qu
 
 SCHEMA:
 - Nodes: Entity(entity_id, canonical_name, entity_type, aliases)
-- Relationships: (Entity)-[r:RELATED {edge_id, confidence, version, evidence_ids, relationship_type}]->(Entity)
+- Relationships: (Entity)-[r:RELATED {edge_id, confidence, version, evidence_ids, semantic_type}]->(Entity)
 
 CRITICAL MATCHING RULES:
 1. ALWAYS use case-insensitive matching with toLower() for entity names
 2. Search BOTH canonical_name AND aliases array
 3. Use CONTAINS for partial matching (e.g., "Einstein" matches "Albert Einstein")
 4. Handle possessives: "Einstein's" → search for "Einstein"
-5. For relationships, use variable like 'r' and access r.confidence, r.relationship_type
+5. For relationships, use variable like 'r' and access r.confidence, r.semantic_type
 
 QUERY PATTERNS:
 
@@ -86,14 +86,14 @@ For finding relationships:
 MATCH (e1:Entity)-[r:RELATED]->(e2:Entity)
 WHERE toLower(e1.canonical_name) CONTAINS toLower($name)
   AND r.confidence >= 0.5
-RETURN e1, r, e2, r.relationship_type AS rel_type
+RETURN e1, r, e2, r.semantic_type AS rel_type
 ```
 
 For specific relationship types (published, won, etc.):
 ```
 MATCH (e1:Entity)-[r:RELATED]->(e2:Entity)
 WHERE toLower(e1.canonical_name) CONTAINS toLower($name)
-  AND toLower(r.relationship_type) CONTAINS toLower($rel_type)
+  AND toLower(r.semantic_type) CONTAINS toLower($rel_type)
   AND r.confidence >= 0.5
 RETURN e1, r, e2
 ```
