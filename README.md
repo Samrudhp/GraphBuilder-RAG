@@ -162,23 +162,23 @@ Dense Embedding (BGE-small via FAISS)
 ╠════════════════════════════════════════════════════════════╣
 ║                                                            ║
 ║  ReverifyAgent                                             ║
-║  ├─ Periodically samples graph edges (E_sample ⊂ E)       ║
-║  ├─ Queries external KBs {Wikidata, DBpedia, Wikipedia}  ║
-║  ├─ Computes: c_ext = Σ(w_k × match(e, KB_k))           ║
-║  └─ Flags edges where |c_internal - c_external| > δ      ║
+║  ├─ Periodically samples graph edges (E_sample ⊂ E)        ║
+║  ├─ Queries external KBs {Wikidata, DBpedia, Wikipedia}    ║
+║  ├─ Computes: c_ext = Σ(w_k × match(e, KB_k))              ║
+║  └─ Flags edges where |c_internal - c_external| > δ        ║
 ║                                                            ║
 ║  ConflictResolverAgent                                     ║
-║  ├─ Detects contradictory facts: (h, r, v₁), (h, r, v₂) ║
-║  ├─ Ranks candidates: score = c_i × recency × trust      ║
-║  └─ Selects highest-ranked or escalates to human review   ║
+║  ├─ Detects contradictory facts: (h, r, v₁), (h, r, v₂)    ║
+║  ├─ Ranks candidates: score = c_i × recency × trust        ║
+║  └─ Selects highest-ranked or escalates to human review    ║
 ║                                                            ║
 ║  SchemaSuggestorAgent                                      ║
-║  ├─ Monitors extraction failures (triples with r ∉ R)    ║
-║  ├─ Suggests new relation types: r_new                    ║
-║  └─ Stores proposals in MongoDB for curator validation    ║
+║  ├─ Monitors extraction failures (triples with r ∉ R)      ║
+║  ├─ Suggests new relation types: r_new                     ║
+║  └─ Stores proposals in MongoDB for curator validation     ║
 ║                                                            ║
-║  Output: MongoDB collections for transparent oversight    ║
-║  {agent_state, conflict_resolutions, schema_suggestions}  ║
+║  Output: MongoDB collections for transparent oversight     ║
+║  {agent_state, conflict_resolutions, schema_suggestions}   ║
 ║                                                            ║
 ╚════════════════════════════════════════════════════════════╝
 ```
@@ -238,7 +238,7 @@ Dense Embedding (BGE-small via FAISS)
 
 ---
 
-## 🧠 Models & Technologies
+##  Models & Technologies
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
@@ -250,7 +250,7 @@ Dense Embedding (BGE-small via FAISS)
 | **Document Store** | MongoDB | Metadata, triples, audit logs, agent decisions |
 | **Query Interface** | Safe NL→Cypher | Constrained LLM-based graph query synthesis
 
-## 💾 Data Stores & Persistence
+##  Data Stores & Persistence
 
 | Store | Purpose | Data |
 |-------|---------|------|
@@ -293,7 +293,6 @@ glow/
 ├── tests/                       # Unit & integration tests
 ├── metrics/                     # Evaluation results & visualizations
 └── evaluation_results/          # Full dataset evaluation outputs
-```
 │   ├── validation/         # Fact validation engine
 │   ├── fusion/             # Neo4j graph fusion
 │   ├── retrieval/          # Hybrid retrieval
