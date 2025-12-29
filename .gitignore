@@ -48,6 +48,9 @@ venv.bak/
 data/
 *.faiss
 *.pkl
+
+# Tests directory
+tests/
 *.db
 *.sqlite
 
@@ -88,3 +91,4 @@ htmlcov/
 
 # Documentation
 docs/_build/
+

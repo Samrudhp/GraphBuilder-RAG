@@ -1,5 +1,17 @@
 # Evaluation Results Summary
 
+## Paper Abstract
+
+**Title**: GraphFusion: A Hybrid Graph–Text Retrieval Architecture for Robust Reasoning
+
+**Abstract** (250 words):
+
+Large language models excel at open-domain question answering but remain fragile under distribution shift, multi-hop reasoning, and fact verification. We present **GraphFusion**, a retrieval and reasoning architecture that fuses vector similarity, knowledge-graph traversal, and graph-grounded verification into a single, update-resilient system. GraphFusion employs a **dual-extraction strategy** combining deterministic table extraction with LLM-based semantic extraction, followed by **bootstrap validation** using external sources (Wikipedia, Wikidata, DBpedia) for the first 1,000 triples to ensure high-quality foundations. The system builds a Neo4j property graph with full provenance tracking and uses a safe NL→Cypher interface with two-stage query generation: direct entity matching for reliability, with LLM-powered synthesis as intelligent fallback. Retrieved evidence spans and graph substructures are fused into unified context, and **GraphVerify**, our novel hallucination detection component, validates model claims against tagged graph edges to detect unsupported inferences. Three autonomous agents maintain quality: **ReverifyAgent** validates triples against external knowledge bases, **ConflictResolverAgent** resolves contradictions using LLM reasoning, and **SchemaSuggestorAgent** identifies ontology gaps.
+
+We evaluate on 1,000 queries across FEVER and HotpotQA. GraphFusion achieves 64.2% overall accuracy, outperforming text-only RAG by +20.4pp and KG-only by +10.5pp. On multi-hop reasoning (HotpotQA), it reaches 95.0% accuracy, exceeding RAG by 40pp and KG-only by 25pp. Confidence calibration improves: GraphFusion exhibits highest mean confidence (0.879, σ=0.067). Although fact-verification remains challenging (33.4% on FEVER) due to retrieval limitations, GraphFusion offers a scalable, auditable foundation for trustworthy Web-scale QA, combining the flexibility of neural retrieval with the precision, controllability, and provenance guarantees of symbolic graphs—an increasingly critical requirement for real-world LLM-based systems.
+
+---
+
 ## Overview
 Complete evaluation of 1000 queries using three retrieval and reasoning methods:
 - **Hybrid**: Neo4j Knowledge Graph + FAISS Vector Similarity (Text + Relationships)
